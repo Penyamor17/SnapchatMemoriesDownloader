@@ -1,0 +1,106 @@
+name: Build macOS App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    name: Build macOS App
+    runs-on: macos-latest
+
+    steps:
+
+      # ======================================================
+      # Repository auschecken
+      # ======================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # ======================================================
+      # Python installieren
+      # ======================================================
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+
+      # ======================================================
+      # Dependencies installieren
+      # ======================================================
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+
+      # ======================================================
+      # Python-Datei auf Syntaxfehler prüfen
+      # ======================================================
+
+      - name: Check Python syntax
+        run: |
+          python -m py_compile snapchat_download.py
+
+
+      # ======================================================
+      # macOS .app bauen
+      # ======================================================
+
+      - name: Build macOS application
+        run: |
+          python -m PyInstaller \
+            --noconfirm \
+            --clean \
+            --windowed \
+            --name "SnapchatMemoriesDownloader" \
+            snapchat_download.py
+
+
+      # ======================================================
+      # Prüfen, ob .app tatsächlich erstellt wurde
+      # ======================================================
+
+      - name: Verify application bundle
+        run: |
+          if [ ! -d "dist/SnapchatMemoriesDownloader.app" ]; then
+            echo "ERROR: SnapchatMemoriesDownloader.app was not created."
+            exit 1
+          fi
+
+          echo "Application successfully created."
+          ls -la dist/
+
+
+      # ======================================================
+      # .app als ZIP verpacken
+      #
+      # Wichtig:
+      # ditto verwenden statt normales zip, damit die
+      # macOS App-Struktur korrekt erhalten bleibt.
+      # ======================================================
+
+      - name: Create distribution ZIP
+        run: |
+          ditto \
+            -c \
+            -k \
+            --keepParent \
+            "dist/SnapchatMemoriesDownloader.app" \
+            "SnapchatMemoriesDownloader-macOS.zip"
+
+
+      # ======================================================
+      # ZIP als GitHub Artifact bereitstellen
+      # ======================================================
+
+      - name: Upload macOS application
+        uses: actions/upload-artifact@v4
+        with:
+          name: SnapchatMemoriesDownloader-macOS
+          path: SnapchatMemoriesDownloader-macOS.zip
+          if-no-files-found: error
